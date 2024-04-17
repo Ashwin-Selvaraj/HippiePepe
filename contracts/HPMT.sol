@@ -1,4 +1,23 @@
+/**
+ *Submitted for verification at basescan.org on 2024-03-13
+ */
+
+/**
+ *Submitted for verification at basescan.org on 2024-03-11
+ */
+
 // SPDX-License-Identifier: MIT
+
+// Bratt is the son of Brett who desires to follow his dad's footsteps in conquering the charts of the Base Network.
+// Bratt, just like his dad, is a character oozing with so much personality.
+// He is naughty, mischievous and sometimes crazy and wild, but his heart is always in the right place.
+
+// Join Bratt as we traverse the journey towards a milly, starting today!
+
+// Website: https://basedbratt.xyz
+// TG: https://t.me/sonofbrett
+// Twitter: https://x.com/brattsonofbrett
+
 pragma solidity ^0.8.0;
 
 abstract contract Context {
@@ -377,26 +396,39 @@ abstract contract ERC20Capped is Context, ERC20 {
 pragma solidity ^0.8.0;
 
 contract HPMT is ERC20, ERC20Burnable, Ownable, ERC20Capped {
-    uint256 private constant INITIAL_SUPPLY = 10000000000000;
     uint256 public mintedSupply;
+    uint256 public blockReward;
+    uint256 public totalWatchMinutes;
+    uint256 public counter;
+    uint256 public watchTimeCooldown; // Cooldown period between watch time resets (in seconds)
+    mapping(address => uint256) public lastWatchedTime;
+    mapping(address => uint256) public watchStartTime;
+    mapping(address => uint256) public userWatchTime;
+
     //Time duration required for minting eligibility (in seconds)
     // uint256 public constant requiredTime = 300; // 5 mins for example, adjust as needed
     // Mapping to track the last time each user watched TV
-    mapping(address => uint256) public watchingStartTime;
-    mapping(address => uint256) public watchingEndTime;
 
     constructor()
         ERC20("Hippie Pepe", "HPMT")
-        ERC20Capped(999999999999999 * (10 ** decimals()))
+        ERC20Capped(4200000000 * (10 ** decimals()))
     {
-        mint(msg.sender, INITIAL_SUPPLY);
+        mint(msg.sender, 840000000); //amount = 20% (for team - 5% and development - 15%)
+        blockReward = 1000 * (10 ** decimals());
+        watchTimeCooldown = 86400; // 24 hours cooldown
     }
 
-    function distributeTokens(address distributionWallet) external onlyOwner {
-        uint256 supply = balanceOf(msg.sender);
-        require(supply == INITIAL_SUPPLY, "Tokens already distributed");
-
-        _transfer(msg.sender, distributionWallet, supply);
+    // function to distriibute tokens
+    function distributeTokens(
+        address distributionWallet,
+        uint supply
+    ) external onlyOwner {
+        require(supply <= balanceOf(msg.sender), "Insufficient balance");
+        _transfer(
+            msg.sender,
+            distributionWallet,
+            (supply * (10 ** decimals()))
+        );
     }
 
     function mint(
@@ -411,35 +443,110 @@ contract HPMT is ERC20, ERC20Burnable, Ownable, ERC20Capped {
         return true;
     }
 
-    function startWatchTime() public {
-        watchingStartTime[msg.sender] = block.timestamp;
-    }
-
-    function endWatchTime() private {
-        watchingEndTime[msg.sender] = block.timestamp;
-    }
-
-    function mintWithWatchTime() external {
+    function halving() private {
         require(
-            watchingStartTime[msg.sender] > 0,
-            "Can't mint without watching"
+            totalWatchMinutes >= 25200000,
+            "Halving occurs only after 420000 minutes of watch time"
         );
-        endWatchTime();
-        uint timeSpent = (watchingEndTime[msg.sender] -
-            watchingStartTime[msg.sender]);
-        // Check if user has watched TV for required duration
-        // require(timeSpent>= requiredTime, "Insufficient watch time");
+        counter++;
+        totalWatchMinutes = 0;
+        blockReward /= 2;
+    }
 
-        uint amount = timeSpent * (10 ** decimals());
+    function coolingPeiodCheck() public view returns (bool) {
+        return (lastWatchedTime[msg.sender] + watchTimeCooldown <
+            block.timestamp);
+    }
+
+    function mintWithWatchTime(uint timeSpentInMinutes) external {
+        require(coolingPeiodCheck(), "Watch time cooldown has not expired yet");
+        // if - to check 24hrs from watch start time is over
+        if (
+            (watchStartTime[msg.sender] == 0) ||
+            ((watchStartTime[msg.sender] + 86400) > block.timestamp)
+        ) {
+            if (
+                (timeSpentInMinutes > 30 || timeSpentInMinutes == 30) &&
+                userWatchTime[msg.sender] == 0
+            ) {
+                timeSpentInMinutes = 30;
+                watchStartTime[msg.sender] =
+                    block.timestamp -
+                    (timeSpentInMinutes * 60);
+                lastWatchedTime[msg.sender] = block.timestamp;
+                userWatchTime[msg.sender] = 0;
+            } else if (
+                (timeSpentInMinutes > 30 || timeSpentInMinutes == 30) &&
+                userWatchTime[msg.sender] != 0
+            ) {
+                timeSpentInMinutes = 30 - (userWatchTime[msg.sender] / 60);
+                lastWatchedTime[msg.sender] = block.timestamp;
+                userWatchTime[msg.sender] = 0;
+            } else if (
+                timeSpentInMinutes < 30 && userWatchTime[msg.sender] == 0
+            ) {
+                userWatchTime[msg.sender] = timeSpentInMinutes * 60;
+                watchStartTime[msg.sender] =
+                    block.timestamp -
+                    (timeSpentInMinutes * 60);
+            } else {
+                if (
+                    (userWatchTime[msg.sender] / 60) + timeSpentInMinutes >= 30
+                ) {
+                    timeSpentInMinutes = 30 - (userWatchTime[msg.sender] / 60);
+                    lastWatchedTime[msg.sender] = block.timestamp;
+                    userWatchTime[msg.sender] = 0;
+                } else {
+                    userWatchTime[msg.sender] += (timeSpentInMinutes * 60);
+                    if ((userWatchTime[msg.sender] / 60) >= 30) {
+                        lastWatchedTime[msg.sender] = block.timestamp;
+                        userWatchTime[msg.sender] = 0;
+                    }
+                }
+            }
+        } else {
+            if (timeSpentInMinutes > 30 || timeSpentInMinutes == 30) {
+                timeSpentInMinutes == 30;
+                watchStartTime[msg.sender] =
+                    block.timestamp -
+                    (timeSpentInMinutes * 60);
+                lastWatchedTime[msg.sender] = block.timestamp;
+                userWatchTime[msg.sender] = 0;
+            } else {
+                userWatchTime[msg.sender] = (timeSpentInMinutes * 60);
+                watchStartTime[msg.sender] =
+                    block.timestamp -
+                    (timeSpentInMinutes * 60);
+            }
+        }
+        uint amount;
+        if (totalWatchMinutes + (timeSpentInMinutes * 60) >= 25200000) {
+            if (totalWatchMinutes + (timeSpentInMinutes * 60) == 25200000) {
+                amount = timeSpentInMinutes * blockReward;
+                halving();
+            } else if (
+                totalWatchMinutes + (timeSpentInMinutes * 60) > 25200000
+            ) {
+                uint timeDifference = totalWatchMinutes +
+                    (timeSpentInMinutes * 60) -
+                    25200000;
+                amount =
+                    (timeSpentInMinutes - (timeDifference / 60)) *
+                    blockReward;
+                halving();
+                totalWatchMinutes += timeDifference;
+                amount += (timeDifference / 60) * blockReward;
+            }
+        } else {
+            amount = timeSpentInMinutes * blockReward;
+            totalWatchMinutes += (timeSpentInMinutes * 60);
+        }
         // Mint tokens to caller
         require(
-            mintedSupply + amount <= 20000000000000 * (10 ** decimals()),
+            mintedSupply + amount <= 840000000 * (10 ** decimals()),
             "Tokens fully minted in site"
         );
         _mint(msg.sender, amount); // Adjust minting amount as needed
         mintedSupply += amount;
-        // Update  watched time
-        watchingStartTime[msg.sender] = 0;
-        watchingEndTime[msg.sender] = 0;
     }
 }
