@@ -1,23 +1,4 @@
-/**
- *Submitted for verification at basescan.org on 2024-03-13
- */
-
-/**
- *Submitted for verification at basescan.org on 2024-03-11
- */
-
 // SPDX-License-Identifier: MIT
-
-// Bratt is the son of Brett who desires to follow his dad's footsteps in conquering the charts of the Base Network.
-// Bratt, just like his dad, is a character oozing with so much personality.
-// He is naughty, mischievous and sometimes crazy and wild, but his heart is always in the right place.
-
-// Join Bratt as we traverse the journey towards a milly, starting today!
-
-// Website: https://basedbratt.xyz
-// TG: https://t.me/sonofbrett
-// Twitter: https://x.com/brattsonofbrett
-
 pragma solidity ^0.8.0;
 
 abstract contract Context {
@@ -413,7 +394,7 @@ contract HPMT is ERC20, ERC20Burnable, Ownable, ERC20Capped {
         ERC20("Hippie Pepe", "HPMT")
         ERC20Capped(4200000000 * (10 ** decimals()))
     {
-        mint(msg.sender, 840000000); //amount = 20% (for team - 5% and development - 15%)
+        mint(_msgSender(), 840000000); //amount = 20% (for team - 5% and development - 15%)
         blockReward = 1000 * (10 ** decimals());
         watchTimeCooldown = 86400; // 24 hours cooldown
     }
@@ -423,9 +404,9 @@ contract HPMT is ERC20, ERC20Burnable, Ownable, ERC20Capped {
         address distributionWallet,
         uint supply
     ) external onlyOwner {
-        require(supply <= balanceOf(msg.sender), "Insufficient balance");
+        require(supply <= balanceOf(_msgSender()), "Insufficient balance");
         _transfer(
-            msg.sender,
+            _msgSender(),
             distributionWallet,
             (supply * (10 ** decimals()))
         );
@@ -454,7 +435,7 @@ contract HPMT is ERC20, ERC20Burnable, Ownable, ERC20Capped {
     }
 
     function coolingPeiodCheck() public view returns (bool) {
-        return (lastWatchedTime[msg.sender] + watchTimeCooldown <
+        return (lastWatchedTime[_msgSender()] + watchTimeCooldown <
             block.timestamp);
     }
 
@@ -462,59 +443,62 @@ contract HPMT is ERC20, ERC20Burnable, Ownable, ERC20Capped {
         require(coolingPeiodCheck(), "Watch time cooldown has not expired yet");
         // if - to check 24hrs from watch start time is over
         if (
-            (watchStartTime[msg.sender] == 0) ||
-            ((watchStartTime[msg.sender] + 86400) > block.timestamp)
+            (watchStartTime[_msgSender()] == 0) ||
+            ((watchStartTime[_msgSender()] + 86400) > block.timestamp)
         ) {
             if (
                 (timeSpentInMinutes > 30 || timeSpentInMinutes == 30) &&
-                userWatchTime[msg.sender] == 0
+                userWatchTime[_msgSender()] == 0
             ) {
                 timeSpentInMinutes = 30;
-                watchStartTime[msg.sender] =
+                watchStartTime[_msgSender()] =
                     block.timestamp -
                     (timeSpentInMinutes * 60);
-                lastWatchedTime[msg.sender] = block.timestamp;
-                userWatchTime[msg.sender] = 0;
+                lastWatchedTime[_msgSender()] = block.timestamp;
+                userWatchTime[_msgSender()] = 0;
             } else if (
                 (timeSpentInMinutes > 30 || timeSpentInMinutes == 30) &&
-                userWatchTime[msg.sender] != 0
+                userWatchTime[_msgSender()] != 0
             ) {
-                timeSpentInMinutes = 30 - (userWatchTime[msg.sender] / 60);
-                lastWatchedTime[msg.sender] = block.timestamp;
-                userWatchTime[msg.sender] = 0;
+                timeSpentInMinutes = 30 - (userWatchTime[_msgSender()] / 60);
+                lastWatchedTime[_msgSender()] = block.timestamp;
+                userWatchTime[_msgSender()] = 0;
             } else if (
-                timeSpentInMinutes < 30 && userWatchTime[msg.sender] == 0
+                timeSpentInMinutes < 30 && userWatchTime[_msgSender()] == 0
             ) {
-                userWatchTime[msg.sender] = timeSpentInMinutes * 60;
-                watchStartTime[msg.sender] =
+                userWatchTime[_msgSender()] = timeSpentInMinutes * 60;
+                watchStartTime[_msgSender()] =
                     block.timestamp -
                     (timeSpentInMinutes * 60);
             } else {
                 if (
-                    (userWatchTime[msg.sender] / 60) + timeSpentInMinutes >= 30
+                    (userWatchTime[_msgSender()] / 60) + timeSpentInMinutes >=
+                    30
                 ) {
-                    timeSpentInMinutes = 30 - (userWatchTime[msg.sender] / 60);
-                    lastWatchedTime[msg.sender] = block.timestamp;
-                    userWatchTime[msg.sender] = 0;
+                    timeSpentInMinutes =
+                        30 -
+                        (userWatchTime[_msgSender()] / 60);
+                    lastWatchedTime[_msgSender()] = block.timestamp;
+                    userWatchTime[_msgSender()] = 0;
                 } else {
-                    userWatchTime[msg.sender] += (timeSpentInMinutes * 60);
-                    if ((userWatchTime[msg.sender] / 60) >= 30) {
-                        lastWatchedTime[msg.sender] = block.timestamp;
-                        userWatchTime[msg.sender] = 0;
+                    userWatchTime[_msgSender()] += (timeSpentInMinutes * 60);
+                    if ((userWatchTime[_msgSender()] / 60) >= 30) {
+                        lastWatchedTime[_msgSender()] = block.timestamp;
+                        userWatchTime[_msgSender()] = 0;
                     }
                 }
             }
         } else {
             if (timeSpentInMinutes > 30 || timeSpentInMinutes == 30) {
                 timeSpentInMinutes == 30;
-                watchStartTime[msg.sender] =
+                watchStartTime[_msgSender()] =
                     block.timestamp -
                     (timeSpentInMinutes * 60);
-                lastWatchedTime[msg.sender] = block.timestamp;
-                userWatchTime[msg.sender] = 0;
+                lastWatchedTime[_msgSender()] = block.timestamp;
+                userWatchTime[_msgSender()] = 0;
             } else {
-                userWatchTime[msg.sender] = (timeSpentInMinutes * 60);
-                watchStartTime[msg.sender] =
+                userWatchTime[_msgSender()] = (timeSpentInMinutes * 60);
+                watchStartTime[_msgSender()] =
                     block.timestamp -
                     (timeSpentInMinutes * 60);
             }
@@ -546,7 +530,7 @@ contract HPMT is ERC20, ERC20Burnable, Ownable, ERC20Capped {
             mintedSupply + amount <= 840000000 * (10 ** decimals()),
             "Tokens fully minted in site"
         );
-        _mint(msg.sender, amount); // Adjust minting amount as needed
+        _mint(_msgSender(), amount); // Adjust minting amount as needed
         mintedSupply += amount;
     }
 }
