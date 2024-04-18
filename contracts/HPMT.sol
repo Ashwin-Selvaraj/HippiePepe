@@ -379,24 +379,18 @@ pragma solidity ^0.8.0;
 contract HPMT is ERC20, ERC20Burnable, Ownable, ERC20Capped {
     uint256 public mintedSupply;
     uint256 public blockReward;
-    uint256 public totalWatchMinutes;
+    uint256 public totalWatchSeconds;
     uint256 public counter;
-    uint256 public watchTimeCooldown; // Cooldown period between watch time resets (in seconds)
-    mapping(address => uint256) public lastWatchedTime;
-    mapping(address => uint256) public watchStartTime;
-    mapping(address => uint256) public userWatchTime;
-
-    //Time duration required for minting eligibility (in seconds)
-    // uint256 public constant requiredTime = 300; // 5 mins for example, adjust as needed
-    // Mapping to track the last time each user watched TV
+    mapping(address => bool) public isUserDurationLimitReached; //mapping to track users watch sts
+    mapping(address => uint256) public userWatchDuration; //mapping to track users watch minutes
+    mapping(address => uint256) public userCurrentHalving; //mapping to track the current halving counter
 
     constructor()
         ERC20("Hippie Pepe", "HPMT")
-        ERC20Capped(4200000000 * (10 ** decimals()))
+        ERC20Capped(17922656250 * (10 ** decimals()))
     {
-        mint(_msgSender(), 840000000); //amount = 20% (for team - 5% and development - 15%)
-        blockReward = 1000 * (10 ** decimals());
-        watchTimeCooldown = 86400; // 24 hours cooldown
+        mint(_msgSender(), 2692089844); //amount = 15% (for team - 5% and development - 10%)
+        blockReward = 50 * (10 ** decimals());
     }
 
     // function to distriibute tokens
@@ -426,111 +420,77 @@ contract HPMT is ERC20, ERC20Burnable, Ownable, ERC20Capped {
 
     function halving() private {
         require(
-            totalWatchMinutes >= 25200000,
-            "Halving occurs only after 420000 minutes of watch time"
+            totalWatchSeconds >= 18000000,
+            "Halving occurs only after 18000000 seconds of watch time"
         );
+        require(counter < 9, "Total halving limit reached");
         counter++;
-        totalWatchMinutes = 0;
+        totalWatchSeconds = 0;
         blockReward /= 2;
     }
 
-    function coolingPeiodCheck() public view returns (bool) {
-        return (lastWatchedTime[_msgSender()] + watchTimeCooldown <
-            block.timestamp);
+    // function to check the cooling period of a user
+    function coolingPeriodCheck() public view returns (bool) {
+        return isUserDurationLimitReached[_msgSender()];
     }
 
-    function mintWithWatchTime(uint timeSpentInMinutes) external {
-        require(coolingPeiodCheck(), "Watch time cooldown has not expired yet");
-        // if - to check 24hrs from watch start time is over
+    function mintWithWatchTime(uint timeSpentInSeconds) external {
+        if (userCurrentHalving[_msgSender()] != counter) {
+            isUserDurationLimitReached[_msgSender()] = false;
+        }
+        require(!coolingPeriodCheck(), "User Cooldown time has not expired");
         if (
-            (watchStartTime[_msgSender()] == 0) ||
-            ((watchStartTime[_msgSender()] + 86400) > block.timestamp)
+            timeSpentInSeconds >= 6000 && userWatchDuration[_msgSender()] == 0
         ) {
-            if (
-                (timeSpentInMinutes > 30 || timeSpentInMinutes == 30) &&
-                userWatchTime[_msgSender()] == 0
-            ) {
-                timeSpentInMinutes = 30;
-                watchStartTime[_msgSender()] =
-                    block.timestamp -
-                    (timeSpentInMinutes * 60);
-                lastWatchedTime[_msgSender()] = block.timestamp;
-                userWatchTime[_msgSender()] = 0;
-            } else if (
-                (timeSpentInMinutes > 30 || timeSpentInMinutes == 30) &&
-                userWatchTime[_msgSender()] != 0
-            ) {
-                timeSpentInMinutes = 30 - (userWatchTime[_msgSender()] / 60);
-                lastWatchedTime[_msgSender()] = block.timestamp;
-                userWatchTime[_msgSender()] = 0;
-            } else if (
-                timeSpentInMinutes < 30 && userWatchTime[_msgSender()] == 0
-            ) {
-                userWatchTime[_msgSender()] = timeSpentInMinutes * 60;
-                watchStartTime[_msgSender()] =
-                    block.timestamp -
-                    (timeSpentInMinutes * 60);
-            } else {
-                if (
-                    (userWatchTime[_msgSender()] / 60) + timeSpentInMinutes >=
-                    30
-                ) {
-                    timeSpentInMinutes =
-                        30 -
-                        (userWatchTime[_msgSender()] / 60);
-                    lastWatchedTime[_msgSender()] = block.timestamp;
-                    userWatchTime[_msgSender()] = 0;
-                } else {
-                    userWatchTime[_msgSender()] += (timeSpentInMinutes * 60);
-                    if ((userWatchTime[_msgSender()] / 60) >= 30) {
-                        lastWatchedTime[_msgSender()] = block.timestamp;
-                        userWatchTime[_msgSender()] = 0;
-                    }
-                }
-            }
+            timeSpentInSeconds = 6000;
+            isUserDurationLimitReached[_msgSender()] = true;
+            userCurrentHalving[_msgSender()] = counter;
+        } else if (
+            timeSpentInSeconds >= 6000 && userWatchDuration[_msgSender()] != 0
+        ) {
+            timeSpentInSeconds = 6000 - userWatchDuration[_msgSender()];
+            isUserDurationLimitReached[_msgSender()] = true;
+            userCurrentHalving[_msgSender()] = counter;
+            userWatchDuration[_msgSender()] = 0;
+        } else if (
+            timeSpentInSeconds < 6000 && userWatchDuration[_msgSender()] == 0
+        ) {
+            userWatchDuration[_msgSender()] = timeSpentInSeconds;
         } else {
-            if (timeSpentInMinutes > 30 || timeSpentInMinutes == 30) {
-                timeSpentInMinutes == 30;
-                watchStartTime[_msgSender()] =
-                    block.timestamp -
-                    (timeSpentInMinutes * 60);
-                lastWatchedTime[_msgSender()] = block.timestamp;
-                userWatchTime[_msgSender()] = 0;
+            if (
+                (userWatchDuration[_msgSender()]) + timeSpentInSeconds >= 6000
+            ) {
+                timeSpentInSeconds = 6000 - userWatchDuration[_msgSender()];
+                isUserDurationLimitReached[_msgSender()] = true;
+                userCurrentHalving[_msgSender()] = counter;
+                userWatchDuration[_msgSender()] = 0;
             } else {
-                userWatchTime[_msgSender()] = (timeSpentInMinutes * 60);
-                watchStartTime[_msgSender()] =
-                    block.timestamp -
-                    (timeSpentInMinutes * 60);
+                userWatchDuration[_msgSender()] += timeSpentInSeconds;
             }
         }
         uint amount;
-        if (totalWatchMinutes + (timeSpentInMinutes * 60) >= 25200000) {
-            if (totalWatchMinutes + (timeSpentInMinutes * 60) == 25200000) {
-                amount = timeSpentInMinutes * blockReward;
+        if (totalWatchSeconds + timeSpentInSeconds >= 18000000) {
+            if (totalWatchSeconds + timeSpentInSeconds == 18000000) {
+                amount = timeSpentInSeconds * blockReward;
                 halving();
-            } else if (
-                totalWatchMinutes + (timeSpentInMinutes * 60) > 25200000
-            ) {
-                uint timeDifference = totalWatchMinutes +
-                    (timeSpentInMinutes * 60) -
-                    25200000;
-                amount =
-                    (timeSpentInMinutes - (timeDifference / 60)) *
-                    blockReward;
+            } else if (totalWatchSeconds + timeSpentInSeconds > 18000000) {
+                uint timeDifference = (totalWatchSeconds + timeSpentInSeconds) -
+                    18000000;
+                amount = (timeSpentInSeconds - timeDifference) * blockReward;
                 halving();
-                totalWatchMinutes += timeDifference;
-                amount += (timeDifference / 60) * blockReward;
+                totalWatchSeconds += timeDifference;
+                amount += timeDifference * blockReward;
             }
         } else {
-            amount = timeSpentInMinutes * blockReward;
-            totalWatchMinutes += (timeSpentInMinutes * 60);
+            amount = timeSpentInSeconds * blockReward;
+            totalWatchSeconds += timeSpentInSeconds;
         }
         // Mint tokens to caller
         require(
-            mintedSupply + amount <= 840000000 * (10 ** decimals()),
+            mintedSupply + amount <= 1798242188 * (10 ** decimals()),
             "Tokens fully minted in site"
         );
-        _mint(_msgSender(), amount); // Adjust minting amount as needed
+        _mint(_msgSender(), amount);
         mintedSupply += amount;
     }
 }
