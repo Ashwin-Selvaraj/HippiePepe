@@ -377,20 +377,24 @@ abstract contract ERC20Capped is Context, ERC20 {
 pragma solidity ^0.8.0;
 
 contract HPMT is ERC20, ERC20Burnable, Ownable, ERC20Capped {
-    uint256 public mintedSupply;
-    uint256 public blockReward;
+    uint256 public userRewardMintedSupply;
+    uint256 public creatorRewardMintedSupply;
+    uint256 public userReward;
+    uint256 public creatorReward;
     uint256 public totalWatchSeconds;
     uint256 public counter;
-    mapping(address => bool) public isUserDurationLimitReached; //mapping to track users watch sts
+    mapping(address => bool) public isUserDurationLimitReached; //mapping to track users watch status
     mapping(address => uint256) public userWatchDuration; //mapping to track users watch minutes
     mapping(address => uint256) public userCurrentHalving; //mapping to track the current halving counter
+    mapping(uint => address) public creatorOfTheVideo; //mapping to track the video and its creator
 
     constructor()
         ERC20("Hippie Pepe", "HPMT")
         ERC20Capped(17922656250 * (10 ** decimals()))
     {
-        mint(_msgSender(), 2692089844); //amount = 15% (for team - 5% and development - 10%)
-        blockReward = 50 * (10 ** decimals());
+        mint(_msgSender(), 2692089844); //userAmount = 15% (for team - 5% and development - 10%)
+        userReward = 50 * (10 ** decimals());
+        creatorReward = 97656250000000000;
     }
 
     // function to distriibute tokens
@@ -408,14 +412,18 @@ contract HPMT is ERC20, ERC20Burnable, Ownable, ERC20Capped {
 
     function mint(
         address account,
-        uint256 amount
+        uint256 userAmount
     ) public onlyOwner returns (bool) {
         require(
-            ERC20.totalSupply() + (amount * 10 ** decimals()) <= cap(),
+            ERC20.totalSupply() + (userAmount * 10 ** decimals()) <= cap(),
             "ERC20Capped: cap exceeded"
         );
-        _mint(account, (amount * 10 ** decimals()));
+        _mint(account, (userAmount * 10 ** decimals()));
         return true;
+    }
+
+    function uploadVideo(uint videoID) public {
+        creatorOfTheVideo[videoID] = _msgSender();
     }
 
     function halving() private {
@@ -426,7 +434,8 @@ contract HPMT is ERC20, ERC20Burnable, Ownable, ERC20Capped {
         require(counter < 9, "Total halving limit reached");
         counter++;
         totalWatchSeconds = 0;
-        blockReward /= 2;
+        userReward /= 2;
+        creatorReward *= 2;
     }
 
     // function to check the cooling period of a user
@@ -434,11 +443,26 @@ contract HPMT is ERC20, ERC20Burnable, Ownable, ERC20Capped {
         return isUserDurationLimitReached[_msgSender()];
     }
 
-    function mintWithWatchTime(uint timeSpentInSeconds) external {
+    function mintWithWatchTime(
+        uint[] memory arrOfWatchTime,
+        uint[] memory arrOfVideos
+    ) external {
+        require(
+            arrOfWatchTime.length == arrOfVideos.length,
+            "The Array lengths can't be different"
+        );
         if (userCurrentHalving[_msgSender()] != counter) {
             isUserDurationLimitReached[_msgSender()] = false;
         }
         require(!coolingPeriodCheck(), "User Cooldown time has not expired");
+        uint timeSpentInSeconds = 0;
+        uint totalTime = 0;
+        // adding all watch time in an array to timeSpentInSeconds
+        for (uint i = 0; i < arrOfWatchTime.length; i++) {
+            timeSpentInSeconds += arrOfWatchTime[i];
+            totalTime += arrOfWatchTime[i];
+        }
+        // Calculating time spent in seconds
         if (
             timeSpentInSeconds >= 6000 && userWatchDuration[_msgSender()] == 0
         ) {
@@ -468,29 +492,96 @@ contract HPMT is ERC20, ERC20Burnable, Ownable, ERC20Capped {
                 userWatchDuration[_msgSender()] += timeSpentInSeconds;
             }
         }
-        uint amount;
+
+        // if statement to set the watch time for creators based on user watch time
+        if (totalTime != timeSpentInSeconds) {
+            uint differenceInTime = totalTime - timeSpentInSeconds;
+            for (uint i = (arrOfWatchTime.length - 1); i >= 0; i--) {
+                if (differenceInTime == 0) break;
+                if (arrOfWatchTime[i] < differenceInTime) {
+                    differenceInTime -= arrOfWatchTime[i];
+                    arrOfWatchTime[i] = 0;
+                } else {
+                    arrOfWatchTime[i] -= differenceInTime;
+                    differenceInTime = 0;
+                }
+            }
+        }
+
+        uint userAmount;
+        uint[] memory arrOfCreatorAmount = new uint[](arrOfWatchTime.length);
+        uint creatorRewardArrayCounter = 0;
         if (totalWatchSeconds + timeSpentInSeconds >= 18000000) {
             if (totalWatchSeconds + timeSpentInSeconds == 18000000) {
-                amount = timeSpentInSeconds * blockReward;
+                userAmount = timeSpentInSeconds * userReward;
+                for (
+                    uint i = creatorRewardArrayCounter;
+                    i < arrOfWatchTime.length;
+                    i++
+                ) {
+                    arrOfCreatorAmount[i] = arrOfWatchTime[i] * creatorReward;
+                }
                 halving();
-            } else if (totalWatchSeconds + timeSpentInSeconds > 18000000) {
+            } else {
                 uint timeDifference = (totalWatchSeconds + timeSpentInSeconds) -
                     18000000;
-                amount = (timeSpentInSeconds - timeDifference) * blockReward;
-                halving();
+                userAmount = (timeSpentInSeconds - timeDifference) * userReward;
+                for (uint i = 0; i < arrOfWatchTime.length; i++) {
+                    if (arrOfWatchTime[i] + totalWatchSeconds < 18000000) {
+                        arrOfCreatorAmount[i] =
+                            arrOfWatchTime[i] *
+                            creatorReward;
+                    } else if (
+                        arrOfWatchTime[i] + totalWatchSeconds == 18000000
+                    ) {
+                        arrOfCreatorAmount[i] =
+                            arrOfWatchTime[i] *
+                            creatorReward;
+                        creatorRewardArrayCounter = i;
+                        halving();
+                    } else {
+                        uint timeDiff = (totalWatchSeconds +
+                            arrOfWatchTime[i]) - 18000000;
+                        arrOfCreatorAmount[i] =
+                            (arrOfWatchTime[i] - timeDiff) *
+                            creatorReward;
+                        creatorRewardArrayCounter = i;
+                        halving();
+                        arrOfCreatorAmount[i] += timeDiff * creatorReward;
+                    }
+                }
                 totalWatchSeconds += timeDifference;
-                amount += timeDifference * blockReward;
+                userAmount += timeDifference * userReward;
             }
         } else {
-            amount = timeSpentInSeconds * blockReward;
+            userAmount = timeSpentInSeconds * userReward;
             totalWatchSeconds += timeSpentInSeconds;
+            for (
+                uint i = creatorRewardArrayCounter;
+                i < arrOfWatchTime.length;
+                i++
+            ) {
+                arrOfCreatorAmount[i] = arrOfWatchTime[i] * creatorReward;
+            }
         }
-        // Mint tokens to caller
+        // Mint tokens to the user to distrubute rewards
         require(
-            mintedSupply + amount <= 1798242188 * (10 ** decimals()),
-            "Tokens fully minted in site"
+            userRewardMintedSupply + userAmount <=
+                1798242188 * (10 ** decimals()),
+            "User Reward Tokens fully minted in site"
         );
-        _mint(_msgSender(), amount);
-        mintedSupply += amount;
+        _mint(_msgSender(), userAmount);
+        userRewardMintedSupply += userAmount;
+
+        // Mint tokens to the creator to distrubute rewards
+        for (uint256 i = 0; i < arrOfCreatorAmount.length; i++) {
+            require(
+                creatorRewardMintedSupply + arrOfCreatorAmount[i] <=
+                    1798242188 * (10 ** decimals()),
+                "Creator Reward Tokens fully minted in site"
+            );
+            _mint(creatorOfTheVideo[arrOfVideos[i]], arrOfCreatorAmount[i]);
+            creatorRewardMintedSupply += arrOfCreatorAmount[i];
+        }
     }
 }
