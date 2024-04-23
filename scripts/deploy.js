@@ -1,5 +1,7 @@
 const { ethers, run } = require("hardhat");
 require("dotenv").config;
+const { writeFileSync } = require("fs");
+const hre = require("hardhat");
 
 // const {}
 async function main() {
@@ -10,13 +12,19 @@ async function main() {
   const provider = new ethers.JsonRpcProvider(
     "https://sepolia.infura.io/v3/0fba3fdf4179467ba9832ac74d77445c"
   );
-  console.log(provider);
 
   // provoider for Matic testnet
-  //   const provider = new ethers.JsonRpcProvider('https://autumn-falling-firefly.matic-testnet.quiknode.pro/c8e3ff914ff86361fd66c6de0e7aed3c878963fb/')
+  // const provider = new ethers.JsonRpcProvider(
+  //   "https://autumn-falling-firefly.matic-testnet.quiknode.pro/c8e3ff914ff86361fd66c6de0e7aed3c878963fb/"
+  // );
 
   // provoider for Scroll sepolia testnet
-  // const provider = new ethers.JsonRpcProvider('https://silent-thrilling-frost.scroll-testnet.quiknode.pro/028364d65d7818e04d58c37105ccc9e342e48c54/')
+  // const provider = new ethers.JsonRpcProvider(
+  //   "https://winter-ultra-sheet.scroll-testnet.quiknode.pro/3d92ec6b4d0bd800befb790f751b5b79441575a1/"
+  // );
+
+  console.log(provider);
+
   const deployer = new ethers.Wallet(private_key, provider);
   console.log(`Deploying contracts with the account: ${deployer.address}`);
   const balance = await provider.getBalance(deployer);
@@ -26,6 +34,29 @@ async function main() {
   const hpmt = await HPMTFactory.connect(deployer).deploy();
   await hpmt.waitForDeployment();
   console.log(`HPMT contract address: ${hpmt.target}`);
+
+  writeFileSync(
+    "deploy.json",
+    JSON.stringify(
+      {
+        HPMTContractAddress: hpmt.target,
+      },
+      null,
+      2
+    )
+  );
+
+  async function verify(contractAddress, args) {
+    try {
+      await hre.run("verify:verify", {
+        address: contractAddress,
+        constructorArgument: args,
+      });
+      console.log("HPMT Contract successfully verified on Etherscan");
+    } catch (e) {
+      console.log(e);
+    }
+  }
 }
 
 main()
